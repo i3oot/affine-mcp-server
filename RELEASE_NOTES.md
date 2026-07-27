@@ -1,5 +1,16 @@
 # Release Notes
 
+## Version 3.1.2 (2026-07-28)
+
+### Highlights
+- Includes the AFFiNE 0.27+ refreshable native-session authentication introduced in 3.1.1.
+- Builds the architecture-independent application on the native build platform and assembles compatible amd64 and ARM64 runtime images without emulating the TypeScript build.
+
+### Validation Evidence
+- Authentication session regression suite
+- Metadata, documentation, tool-manifest, and package verification
+- Multi-platform container release build
+
 ## Version 3.1.1 (2026-07-28)
 
 ### Highlights
