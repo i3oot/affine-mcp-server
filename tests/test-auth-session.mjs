@@ -223,6 +223,7 @@ async function startMcpServer(baseUrl, options = {}) {
   return {
     child,
     logs,
+    publicBaseUrl,
     mcpUrl: `${publicBaseUrl}/mcp`,
     async close() {
       if (child.exitCode !== null) return;
@@ -448,6 +449,11 @@ async function testEnvironmentCredentialsOverrideSavedAuthentication() {
     const mcp = await startMcpServer(mock.baseUrl, { configHome });
     let client;
     try {
+      if (index === 0) {
+        const root = await fetch(mcp.publicBaseUrl);
+        assertEqual(root.status, 200, "root platform probe status");
+        assertEqual(await root.text(), "affine-mcp\n", "root platform probe body");
+      }
       client = await createMcpClient(mcp.mcpUrl, `environment-auth-${index}`);
       const result = await client.client.callTool({ name: "current_user", arguments: {} });
 

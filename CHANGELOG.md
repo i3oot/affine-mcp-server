@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.3] - 2026-07-28
+
+### Fixed
+- HTTP mode now returns a minimal unauthenticated 200 response at `/` so Knative/Kourier and load-balancer route probes can mark the public Ingress ready while `/mcp` remains protected.
+
 ## [3.1.2] - 2026-07-28
 
 ### Fixed
@@ -677,6 +682,7 @@ Document create/edit/delete is now supported. These are synchronized to real AFF
 [1.4.0]: https://github.com/dawncr0w/affine-mcp-server/releases/tag/v1.4.0
 [1.3.0]: https://github.com/dawncr0w/affine-mcp-server/releases/tag/v1.3.0
 [1.6.0]: https://github.com/dawncr0w/affine-mcp-server/releases/tag/v1.6.0
+[3.1.3]: https://github.com/i3oot/affine-mcp-server/releases/tag/v3.1.3
 [3.1.2]: https://github.com/i3oot/affine-mcp-server/releases/tag/v3.1.2
 [3.1.1]: https://github.com/i3oot/affine-mcp-server/releases/tag/v3.1.1
-[Unreleased]: https://github.com/i3oot/affine-mcp-server/compare/v3.1.2...HEAD
+[Unreleased]: https://github.com/i3oot/affine-mcp-server/compare/v3.1.3...HEAD

@@ -161,6 +161,7 @@ HTTP mode exposes:
 - `/mcp` - Streamable HTTP MCP endpoint protected by the configured MCP auth mode
 - `/sse` - SSE endpoint for older-compatible clients protected by the configured MCP auth mode
 - `/messages` - message endpoint for older-compatible clients protected by the configured MCP auth mode
+- `/` - minimal unauthenticated 200 response for Knative/Kourier and load-balancer route probes
 - `/healthz` - unauthenticated process liveness probe for trusted platform checks
 - `/readyz` - unauthenticated readiness probe that checks OAuth discovery when enabled and the exact configured AFFiNE GraphQL endpoint
 

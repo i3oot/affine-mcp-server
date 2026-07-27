@@ -1,5 +1,16 @@
 # Release Notes
 
+## Version 3.1.3 (2026-07-28)
+
+### Highlights
+- Includes refreshable AFFiNE 0.27+ native-session authentication and optimized multi-platform images.
+- Adds a minimal root route for Knative/Kourier and load-balancer readiness probes without weakening MCP endpoint authentication.
+
+### Validation Evidence
+- HTTP bearer protection and root-probe regression coverage
+- Authentication session regression suite
+- Metadata, documentation, tool-manifest, and package verification
+
 ## Version 3.1.2 (2026-07-28)
 
 ### Highlights

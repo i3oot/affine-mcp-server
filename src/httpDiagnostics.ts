@@ -60,6 +60,12 @@ export function registerHttpDiagnosticsRoutes(
   authState: HttpAuthState,
   corsMiddleware: (req: Request, res: Response, next: NextFunction) => void,
 ) {
+  // Knative/Kourier probes the route root and requires a 200 before marking
+  // the Ingress ready. Keep this response minimal and unauthenticated.
+  app.get("/", corsMiddleware, (_req: Request, res: Response) => {
+    res.status(200).type("text/plain").send("affine-mcp\n");
+  });
+
   app.get("/healthz", corsMiddleware, (_req: Request, res: Response) => {
     res.json({
       status: "ok",

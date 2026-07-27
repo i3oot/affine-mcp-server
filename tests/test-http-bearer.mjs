@@ -122,6 +122,9 @@ async function main() {
 
   try {
     server = await startBearerHttpServer(staticToken);
+    const root = await fetch(server.publicBaseUrl);
+    expectEqual(root.status, 200, "root platform probe status");
+    expectEqual(await root.text(), "affine-mcp\n", "root platform probe body");
     const healthz = await fetch(`${server.publicBaseUrl}/healthz`);
     expectEqual(healthz.status, 200, "healthz status");
     const readyz = await fetch(`${server.publicBaseUrl}/readyz`);
