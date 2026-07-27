@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.1] - 2026-07-28
+
+### Fixed
+- Self-hosted email/password authentication now requests an AFFiNE 0.27+ native session, exchanges the one-time sign-in code for an access/refresh token pair, and automatically rotates the refresh token before the access token expires.
+- GraphQL, REST, multipart, and WebSocket consumers now resolve the current process-scoped credential for each request instead of retaining the first access token indefinitely.
+- Older AFFiNE servers remain compatible: when native sessions are unavailable, the server reuses the session cookie returned by sign-in without submitting credentials twice.
+
+### Tests
+- Added deterministic coverage for concurrent native-session refresh, rotated token delivery, legacy cookie fallback, and fail-closed single-flight login errors.
+
 ## [3.1.0] - 2026-07-27
 
 ### Added
@@ -662,4 +672,5 @@ Document create/edit/delete is now supported. These are synchronized to real AFF
 [1.4.0]: https://github.com/dawncr0w/affine-mcp-server/releases/tag/v1.4.0
 [1.3.0]: https://github.com/dawncr0w/affine-mcp-server/releases/tag/v1.3.0
 [1.6.0]: https://github.com/dawncr0w/affine-mcp-server/releases/tag/v1.6.0
-[Unreleased]: https://github.com/dawncr0w/affine-mcp-server/compare/v3.1.0...HEAD
+[3.1.1]: https://github.com/i3oot/affine-mcp-server/releases/tag/v3.1.1
+[Unreleased]: https://github.com/i3oot/affine-mcp-server/compare/v3.1.1...HEAD

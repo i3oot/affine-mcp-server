@@ -1,5 +1,22 @@
 # Release Notes
 
+## Version 3.1.1 (2026-07-28)
+
+### Highlights
+- Restores write-capable authentication against self-hosted AFFiNE 0.27+ without relying on the removed legacy personal-access-token API.
+- Email/password deployments now obtain refreshable native access tokens and rotate them automatically for long-running MCP processes.
+- Older cookie-based AFFiNE deployments continue to work without an extra sign-in request.
+
+### Compatibility
+- No tools or tool inputs changed.
+- Existing `AFFINE_EMAIL` and `AFFINE_PASSWORD` configuration is reused; no refresh token needs to be stored.
+- `AFFINE_COOKIE` and compatible bearer-token configurations continue to work unchanged.
+
+### Validation Evidence
+- Authentication session regression suite, including concurrent refresh rotation
+- Metadata, documentation, and tool-manifest verification
+- TypeScript build and package validation
+
 ## Version 3.1.0 (2026-07-27)
 
 ### Highlights

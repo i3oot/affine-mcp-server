@@ -299,6 +299,48 @@ async function testSingleFlightPrimitive() {
   assertEqual((await bearerPriority.ready()).kind, "bearer", "bearer ignores incomplete lower-priority credentials");
 }
 
+async function testNativeSessionRefresh() {
+  let loginCalls = 0;
+  let refreshCalls = 0;
+  const session = new AuthSession({
+    baseUrl: "http://127.0.0.1:1",
+    email: EMAIL,
+    password: PASSWORD,
+    nativeLogin: async () => {
+      loginCalls += 1;
+      return {
+        accessToken: "initial-access-token",
+        refreshToken: "initial-refresh-token",
+        accessTokenExpiresAt: Date.now() + 1,
+        installationId: "test-installation",
+      };
+    },
+    nativeRefresh: async (_baseUrl, current) => {
+      refreshCalls += 1;
+      await delay(50);
+      assertEqual(current.refreshToken, "initial-refresh-token", "refresh receives current token");
+      return {
+        accessToken: "rotated-access-token",
+        refreshToken: "rotated-refresh-token",
+        accessTokenExpiresAt: Date.now() + 120_000,
+        installationId: current.installationId,
+      };
+    },
+  });
+
+  const initial = await session.ready();
+  assertEqual(initial.token, "initial-access-token", "native login access token");
+  const refreshed = await Promise.all(Array.from({ length: 20 }, () => session.ready()));
+  assertEqual(loginCalls, 1, "native login runs once");
+  assertEqual(refreshCalls, 1, "concurrent consumers share one refresh");
+  assert(
+    refreshed.every((snapshot) =>
+      snapshot.kind === "bearer" && snapshot.token === "rotated-access-token"
+    ),
+    "all consumers receive the rotated access token",
+  );
+}
+
 async function testExclusiveAuthState() {
   const client = new GraphQLClient({
     endpoint: "http://127.0.0.1:1/graphql",
@@ -496,6 +538,7 @@ async function testConcurrentHttpSessionsAndDirectMultipart() {
 async function main() {
   assert(existsSync(MCP_SERVER_PATH), "dist/index.js is missing; run npm run build first");
   await testSingleFlightPrimitive();
+  await testNativeSessionRefresh();
   await testExclusiveAuthState();
   await testFailureNeverFallsBack();
   await testEnvironmentCredentialsOverrideSavedAuthentication();

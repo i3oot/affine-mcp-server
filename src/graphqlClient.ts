@@ -81,7 +81,6 @@ function sanitizeErrorBody(s: string, max = 200): string {
 export class GraphQLClient {
   private readonly baseHeaders: Record<string, string>;
   private readonly authProvider?: () => Promise<AuthSnapshot>;
-  private authResolution?: Promise<AuthSnapshot>;
   private resolvedAuth: AuthSnapshot = { kind: "none" };
   private authOverride?: AuthSnapshot;
 
@@ -171,16 +170,13 @@ export class GraphQLClient {
   private resolveAuth(): Promise<AuthSnapshot> {
     if (this.authOverride) return Promise.resolve(this.authOverride);
     if (!this.authProvider) return Promise.resolve(this.resolvedAuth);
-    if (!this.authResolution) {
-      this.authResolution = this.authProvider().then((snapshot) => {
-        const provided = validateAuthSnapshot(snapshot);
-        if (provided.kind !== "none" || this.resolvedAuth.kind === "none") {
-          this.resolvedAuth = provided;
-        }
-        return this.resolvedAuth;
-      });
-    }
-    return this.authResolution;
+    return this.authProvider().then((snapshot) => {
+      const provided = validateAuthSnapshot(snapshot);
+      if (provided.kind !== "none" || this.resolvedAuth.kind === "none") {
+        this.resolvedAuth = provided;
+      }
+      return this.resolvedAuth;
+    });
   }
 
   /** Await authentication and return one normalized credential set for HTTP or WebSocket consumers. */
