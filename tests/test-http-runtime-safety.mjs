@@ -189,13 +189,12 @@ async function postMcp(baseUrl, body, sessionId) {
   });
 }
 
-async function initializeSession(baseUrl, id) {
+async function initializeStateless(baseUrl, id) {
   const response = await postMcp(baseUrl, initializeBody(id));
   const responseBody = await response.text();
-  assertEqual(response.status, 200, `initialize session ${id}: ${responseBody}`);
+  assertEqual(response.status, 200, `stateless initialize ${id}: ${responseBody}`);
   const sessionId = response.headers.get("mcp-session-id");
-  assert(sessionId, `initialize session ${id} did not return mcp-session-id`);
-  return sessionId;
+  assertEqual(sessionId, null, `stateless initialize ${id} returned mcp-session-id`);
 }
 
 async function testRuntimeConfig() {
@@ -266,46 +265,33 @@ async function testBodyLimitErrors() {
   }
 }
 
-async function testSessionCapacityActivityAndIdleCleanup() {
+async function testStatelessRequestsDoNotCreateSessions() {
   const server = await startHealthyServer({
     AFFINE_MCP_HTTP_MAX_SESSIONS: "1",
     AFFINE_MCP_HTTP_SESSION_IDLE_TIMEOUT_MS: "600",
   });
   try {
-    const firstSessionId = await initializeSession(server.baseUrl, 1);
-
-    const full = await postMcp(server.baseUrl, initializeBody(2));
-    assertEqual(full.status, 503, "session capacity status");
-    assertEqual((await readJson(full)).error?.code, -32002, "session capacity error code");
-
-    await delay(400);
-    const activity = await postMcp(
+    await initializeStateless(server.baseUrl, 1);
+    await initializeStateless(server.baseUrl, 2);
+    const tools = await postMcp(
       server.baseUrl,
-      { jsonrpc: "2.0", method: "notifications/initialized" },
-      firstSessionId,
+      { jsonrpc: "2.0", id: 3, method: "tools/list", params: {} },
     );
-    assert([200, 202, 204].includes(activity.status), `session activity status: ${activity.status}`);
-    await activity.body?.cancel();
-
-    await delay(400);
-    const stillFull = await postMcp(server.baseUrl, initializeBody(3));
-    assertEqual(stillFull.status, 503, "session activity refreshes idle deadline");
-    await stillFull.body?.cancel();
-
-    await delay(500);
-    await initializeSession(server.baseUrl, 4);
-    assert(server.logs().stderr.includes("idle timeout"), "idle cleanup should be logged");
+    const body = await tools.text();
+    assertEqual(tools.status, 200, `stateless tools/list: ${body}`);
+    assertEqual(tools.headers.get("mcp-session-id"), null, "tools/list returned mcp-session-id");
+    assert(!server.logs().stderr.includes("StreamableHTTP session initialized"), "streamable session was retained");
   } finally {
     await server.close();
   }
 }
 
-async function testShutdownWithActiveSession() {
+async function testShutdownAfterStatelessRequest() {
   const server = await startHealthyServer({
     AFFINE_MCP_HTTP_SESSION_IDLE_TIMEOUT_MS: "60000",
     AFFINE_MCP_HTTP_SHUTDOWN_TIMEOUT_MS: "1000",
   });
-  await initializeSession(server.baseUrl, 10);
+  await initializeStateless(server.baseUrl, 10);
 
   const startedAt = Date.now();
   server.child.kill("SIGTERM");
@@ -340,7 +326,7 @@ async function testForcedConnectionDeadline() {
   assert(server.logs().stderr.includes("forcing remaining HTTP connections closed"), "forced close should be logged");
 }
 
-async function testInitializeRequestSurvivesIdleSweep() {
+async function testStatelessRequestLeavesNoTrackedSession() {
   const previousIdleTimeout = process.env.AFFINE_MCP_HTTP_SESSION_IDLE_TIMEOUT_MS;
   process.env.AFFINE_MCP_HTTP_SESSION_IDLE_TIMEOUT_MS = "100";
   let releaseRequest;
@@ -386,7 +372,7 @@ async function testInitializeRequestSurvivesIdleSweep() {
     assertEqual(response.status, 200, "delayed initialize response status");
     await response.body?.cancel();
     await delay(150);
-    assertEqual(handle.sessionCount(), 1, "initialize request remains active during idle sweep");
+    assertEqual(handle.sessionCount(), 0, "stateless request left a tracked session");
   } finally {
     releaseRequest?.();
     await handle?.close("Idle sweep test shutdown");
@@ -434,10 +420,10 @@ async function main() {
   await testRuntimeConfig();
   await testStartupErrors();
   await testBodyLimitErrors();
-  await testSessionCapacityActivityAndIdleCleanup();
-  await testShutdownWithActiveSession();
+  await testStatelessRequestsDoNotCreateSessions();
+  await testShutdownAfterStatelessRequest();
   await testForcedConnectionDeadline();
-  await testInitializeRequestSurvivesIdleSweep();
+  await testStatelessRequestLeavesNoTrackedSession();
   await testIdempotentProgrammaticClose();
   console.log("HTTP runtime safety regression tests passed.");
 }

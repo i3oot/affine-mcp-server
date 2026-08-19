@@ -5,7 +5,6 @@ import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
 import type { ServerConfig } from "./config.js";
@@ -328,99 +327,38 @@ export async function startHttpMcpServer(
   // ===========================================================================
   app.all("/mcp", corsMiddleware, authMiddleware, async (req, res) => {
     console.error(`[affine-mcp] Received ${req.method} request to /mcp`);
-    let newTransport: StreamableHTTPServerTransport | undefined;
-    let releaseReservation: (() => void) | undefined;
-    let initializedSessionId: string | undefined;
-    let endSessionRequest: (() => void) | undefined;
+    let transport: StreamableHTTPServerTransport | undefined;
     try {
       if (shutdownPromise) {
         rejectUnavailable(res, "Server is shutting down");
         return;
       }
 
-      // mcp-session-id header can technically be string | string[]; normalise.
-      const sidHeader = req.headers["mcp-session-id"];
-      const sessionId = Array.isArray(sidHeader) ? sidHeader[0] : sidHeader;
-
-      let transport: StreamableHTTPServerTransport;
-      const existing = sessionId ? sessions.get(sessionId) : undefined;
-
-      if (existing?.transport instanceof StreamableHTTPServerTransport) {
-        transport = existing.transport;
-        endSessionRequest = beginSessionRequest(sessionId!, req.method);
-      } else if (!sessionId && req.method === "POST") {
-        // Parse body only for the initialize POST (lazy — avoids consuming the stream early).
-        if (!(await parseJsonBody(req, res))) return;
-
-        if (!isInitializeRequest(req.body)) {
-          sendJsonRpcError(res, 400, -32000, "Bad Request: Not an initialize request");
-          return;
-        }
-
-        releaseReservation = reserveSessionSlot() || undefined;
-        if (!releaseReservation) {
-          rejectUnavailable(res, "Server busy: maximum HTTP MCP session capacity reached");
-          return;
-        }
-
-        transport = new StreamableHTTPServerTransport({
-          sessionIdGenerator: () => randomUUID(),
-          onsessioninitialized: (sid) => {
-            initializedSessionId = sid;
-            releaseReservation?.();
-            console.error(
-              `[affine-mcp] StreamableHTTP session initialized: ${sid}`,
-            );
-            registerSession(sid, transport, "streamable");
-            endSessionRequest = beginSessionRequest(sid, req.method);
-          },
-        });
-        newTransport = transport;
-
-        transport.onclose = () => {
-          const sid = transport.sessionId;
-          if (sid && sessions.has(sid)) {
-            console.error(`[affine-mcp] StreamableHTTP session closed: ${sid}`);
-            removeSession(sid, transport);
-          }
-        };
-
-        const mcpServer = await createMcpServer();
-        await mcpServer.connect(transport);
-      } else {
-        sendJsonRpcError(
-          res,
-          400,
-          -32000,
-          "Bad Request: No valid session ID or not an initialize request",
-        );
+      if (req.method !== "POST") {
+        res.sendStatus(405);
         return;
       }
 
-      // Ensure JSON body is available for subsequent POST requests within the session.
-      if (req.method === "POST" && req.body === undefined) {
-        if (!(await parseJsonBody(req, res))) return;
-      }
+      if (!(await parseJsonBody(req, res))) return;
+
+      // Each request gets a fresh server and transport. With no session ID
+      // generator, a Knative restart cannot invalidate client-side state.
+      transport = new StreamableHTTPServerTransport({
+        sessionIdGenerator: undefined,
+      });
+      const mcpServer = await createMcpServer();
+      await mcpServer.connect(transport);
 
       await transport.handleRequest(req, res, req.body);
-      if (newTransport && !initializedSessionId) {
-        releaseReservation?.();
-        await newTransport.close();
-      }
     } catch (e) {
-      releaseReservation?.();
-      if (newTransport && !initializedSessionId) {
-        try {
-          await newTransport.close();
-        } catch {}
-      }
       console.error("[affine-mcp] Error handling /mcp request:", e);
       if (!res.headersSent) {
         sendJsonRpcError(res, 500, -32603, "Internal server error");
       }
     } finally {
-      endSessionRequest?.();
-      releaseReservation?.();
+      try {
+        await transport?.close();
+      } catch {}
     }
   });
 
