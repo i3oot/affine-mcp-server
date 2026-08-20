@@ -1,0 +1,37 @@
+substitutions:
+  _REGISTRY: europe-west4-docker.pkg.dev/marla-ai/docker-repo
+  _IMAGE: affine-mcp-server
+  _TAG: latest
+  _CACHE_TAG: buildcache
+
+steps:
+  - name: gcr.io/cloud-builders/docker
+    id: setup-buildx
+    entrypoint: bash
+    args:
+      - -ceu
+      - |
+        docker run --privileged --rm tonistiigi/binfmt --install all
+        docker buildx create --name multiarch-builder --driver docker-container --use
+        docker buildx inspect --bootstrap
+
+  - name: gcr.io/cloud-builders/docker
+    id: build-and-push
+    entrypoint: bash
+    args:
+      - -ceu
+      - |
+        IMAGE_URI="${_REGISTRY}/${_IMAGE}:${_TAG}"
+        CACHE_URI="${_REGISTRY}/${_IMAGE}:${_CACHE_TAG}"
+
+        docker buildx build \
+          --platform linux/amd64,linux/arm64 \
+          --tag "$${IMAGE_URI}" \
+          --cache-from "type=registry,ref=$${CACHE_URI}" \
+          --cache-to "type=registry,ref=$${CACHE_URI},mode=max" \
+          --push \
+          .
+
+options:
+  machineType: E2_HIGHCPU_8
+  logging: CLOUD_LOGGING_ONLY
